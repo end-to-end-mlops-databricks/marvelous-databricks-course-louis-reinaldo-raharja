@@ -37,7 +37,7 @@ class DataProcessor:
         categorical_transformer = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy="most_frequent")),  # Changed to most_frequent
-                ("onehot", OneHotEncoder(drop="first", sparse=False)),  # Modified for better handling
+                ("onehot", OneHotEncoder(drop="first", sparse_output=False)),  # Modified for better handling
             ]
         )
 
