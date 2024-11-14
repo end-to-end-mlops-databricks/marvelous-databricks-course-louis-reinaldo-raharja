@@ -26,4 +26,5 @@ jobs:
 
       - name: Run pre-commit checks
         run: |
+          uv pip install pre-commit
           pre-commit run --all-files
