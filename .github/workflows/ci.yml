@@ -9,17 +9,19 @@ jobs:
   build_and_test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
       - name: Set up Python
-        run: uv python install 3.11
+        run: uv python install 3.12.2
 
-      - name: Install the dependencies
-        run: uv sync 
+      - name: Install dependencies
+        run: uv sync
 
       - name: Run pre-commit checks
         run: |
-          pre-commit run --all-files
+          uv pip install pre-commit
+          uv run pre-commit run --all-files
