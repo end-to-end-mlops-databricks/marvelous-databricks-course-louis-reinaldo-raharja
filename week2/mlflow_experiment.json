@@ -1,0 +1,15 @@
+{
+    "_experiment_id": "361037982929593",
+    "_name": "/Shared/life-expectancy-basic",
+    "_artifact_location": "dbfs:/databricks/mlflow-tracking/361037982929593",
+    "_lifecycle_stage": "active",
+    "_tags": {
+        "mlflow.experiment.sourceName": "/Shared/life-expectancy-basic",
+        "mlflow.ownerId": "123342943816188",
+        "mlflow.ownerEmail": "louisreinaldo@gmail.com",
+        "mlflow.experimentType": "MLFLOW_EXPERIMENT",
+        "repository_name": "life-expectancy"
+    },
+    "_creation_time": 1731567862815,
+    "_last_update_time": 1732161384705
+}
