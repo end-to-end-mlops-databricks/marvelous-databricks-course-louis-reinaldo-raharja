@@ -1,5 +1,7 @@
+# Databricks notebook source
 from databricks.connect import DatabricksSession
 from databricks import feature_engineering
+from pyspark.sql import SparkSession
 from databricks.sdk import WorkspaceClient
 import mlflow
 from lightgbm import LGBMRegressor
@@ -9,11 +11,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from databricks.feature_engineering import FeatureFunction, FeatureLookup
-from life_expectancy.config import ProjectConfig
+# from life_expectancy.config import ProjectConfig
 import subprocess
+import pandas as pd
+
+# COMMAND ----------
 
 # Initialize clients
-spark = DatabricksSession.builder.profile("dbc-643c4c2b-d6c9").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 workspace = WorkspaceClient()
 fe = feature_engineering.FeatureEngineeringClient()
 
@@ -21,15 +26,29 @@ fe = feature_engineering.FeatureEngineeringClient()
 mlflow.set_registry_uri("databricks-uc")
 mlflow.set_tracking_uri("databricks")
 
-# Load configuration
-config = ProjectConfig.from_yaml(config_path="../project_config.yml")
-num_features = config.num_features
-cat_features = config.cat_features
-target = config.target
-parameters = config.parameters
+# From config file
+num_features = [
+    'Adult_Mortality', 'infant_deaths', 'Alcohol', 'percentage_expenditure',
+    'Hepatitis_B', 'Measles', 'BMI', 'under-five_deaths', 'Polio',
+    'Total_expenditure', 'Diphtheria', 'HIV_AIDS', 'GDP', 'Population',
+    'thinness_1-19_years', 'thinness_5-9_years', 'Income_composition_of_resources',
+    'Schooling'
+]
+
+cat_features = ['Status']
+
+target = 'Life_expectancy'
+
+parameters = {
+    'learning_rate': 0.01,
+    'n_estimators': 100,
+    'max_depth': 10
+}
+
+# Manual settings
 catalog_name = 'mlops_students'
 spark_table_name = 'hive_metastore'
-schema_name = config.schema_name
+schema_name = 'louisreinaldo'
 table_prefix = 'life_expectancy'
 
 # Create feature table
@@ -59,29 +78,48 @@ SELECT Country, BMI, HIV_AIDS, Total_expenditure
 FROM {spark_table_name}.{schema_name}.{table_prefix}_test
 """)
 
-# Create health index calculation function
+
+# COMMAND ----------
+
+# Create health index calculation function with NULL handling
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {function_name}(bmi DOUBLE, hiv DOUBLE, expenditure DOUBLE)
 RETURNS DOUBLE
 LANGUAGE PYTHON AS
 $$
 def calculate_index(bmi, hiv, expenditure):
+    # Handle NULL values
+    if bmi is None or hiv is None or expenditure is None:
+        return None
+        
     # Normalize and combine health indicators
-    normalized_bmi = min(max(bmi, 18.5), 25) / 25
-    hiv_factor = 1 - (hiv / 100)
-    exp_factor = expenditure / 100
-    return (normalized_bmi + hiv_factor + exp_factor) / 3
+    try:
+        normalized_bmi = min(max(float(bmi), 18.5), 25) / 25
+        hiv_factor = 1 - (float(hiv) / 100)
+        exp_factor = float(expenditure) / 100
+        return (normalized_bmi + hiv_factor + exp_factor) / 3
+    except (TypeError, ValueError):
+        return None
 
 return calculate_index(bmi, hiv, expenditure)
 $$
 """)
 
-# Load datasets
+# COMMAND ----------
+
 print('load dataset')
-train_set = spark.table(f"{spark_table_name}.{schema_name}.{table_prefix}_train")
+# Load datasets and drop the columns that will be looked up
+train_set = spark.table(f"{spark_table_name}.{schema_name}.{table_prefix}_train").drop("BMI", "HIV_AIDS", "Total_expenditure")
 test_set = spark.table(f"{spark_table_name}.{schema_name}.{table_prefix}_test").toPandas()
 
+# Make sure Country column is string type for lookup
+train_set = train_set.withColumn("Country", train_set["Country"].cast("string"))
+
+# COMMAND ----------
+
+print('feature engineering setup')
 # Feature engineering setup
+# Modify the feature engineering setup to handle NULL values
 training_set = fe.create_training_set(
     df=train_set,
     label=target,
@@ -104,33 +142,49 @@ training_set = fe.create_training_set(
     exclude_columns=["update_timestamp_utc"]
 )
 
-# Load and prepare data
+# Handle NULL values in the test set calculation
+test_set["health_index"] = test_set.apply(
+    lambda x: None if pd.isna(x["BMI"]) or pd.isna(x["HIV_AIDS"]) or pd.isna(x["Total_expenditure"])
+    else (min(max(float(x["BMI"]), 18.5), 25) / 25 + 
+          (1 - float(x["HIV_AIDS"]) / 100) + 
+          float(x["Total_expenditure"]) / 100) / 3,
+    axis=1
+)
+
+# COMMAND ----------
+
 training_df = training_set.load_df().toPandas()
 X_train = training_df[num_features + cat_features + ["health_index"]]
 y_train = training_df[target]
 
-# Calculate health index for test set
-test_set["health_index"] = test_set.apply(
-    lambda x: (min(max(x["BMI"], 18.5), 25) / 25 + 
-              (1 - x["HIV_AIDS"] / 100) + 
-              x["Total_expenditure"] / 100) / 3, 
-    axis=1
-)
 X_test = test_set[num_features + cat_features + ["health_index"]]
 y_test = test_set[target]
 
+# COMMAND ----------
+
 # Create and train pipeline
+print('preprocess')
+
 preprocessor = ColumnTransformer(
     transformers=[("cat", OneHotEncoder(handle_unknown="ignore"), cat_features)],
     remainder="passthrough"
 )
+
+print('creating pipeline')
+
 pipeline = Pipeline(
     steps=[("preprocessor", preprocessor), ("regressor", LGBMRegressor(**parameters))]
 )
 
+# COMMAND ----------
+
 # MLflow tracking
-git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()[:7]
+git_sha = 'd4d2b46'
 mlflow.set_experiment(experiment_name="/Shared/life-expectancy-fe")
+
+# COMMAND ----------
+
+print('start mlflow run')
 
 with mlflow.start_run(tags={"branch": "week2", "git_sha": git_sha}) as run:
     run_id = run.info.run_id
@@ -163,8 +217,15 @@ with mlflow.start_run(tags={"branch": "week2", "git_sha": git_sha}) as run:
         signature=signature,
     )
 
+# COMMAND ----------
+
+print('register model')
 # Register model
 mlflow.register_model(
     model_uri=f'runs:/{run_id}/lightgbm-pipeline-model-fe',
     name=f"{catalog_name}.{schema_name}.{table_prefix}_model_fe"
 )
+
+# COMMAND ----------
+
+
