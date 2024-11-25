@@ -1,0 +1,18 @@
+{
+    "_name": "mlops_students.louisreinaldo.life_expectancy_model_pyfunc",
+    "_version": "1",
+    "_creation_time": 1732161854092,
+    "_last_updated_timestamp": 1732161863910,
+    "_description": "",
+    "_user_id": "louisreinaldo@gmail.com",
+    "_current_stage": null,
+    "_source": "dbfs:/databricks/mlflow-tracking/2768133321786140/611d1e0252ac44dd95e77c6f1aa906a8/artifacts/pyfunc-life-expectancy-model",
+    "_run_id": "611d1e0252ac44dd95e77c6f1aa906a8",
+    "_run_link": null,
+    "_status": "READY",
+    "_status_message": "",
+    "_tags": {
+        "git_sha": "558a5ce"
+    },
+    "_aliases": []
+}

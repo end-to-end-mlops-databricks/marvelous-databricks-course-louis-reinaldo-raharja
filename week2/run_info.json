@@ -1,0 +1,37 @@
+{
+    "info": {
+        "artifact_uri": "dbfs:/databricks/mlflow-tracking/361037982929593/49bf8a3fcf59494d8ff7936001f4b2a3/artifacts",
+        "end_time": 1732245337739,
+        "experiment_id": "361037982929593",
+        "lifecycle_stage": "active",
+        "run_id": "49bf8a3fcf59494d8ff7936001f4b2a3",
+        "run_name": "demo-run",
+        "run_uuid": "49bf8a3fcf59494d8ff7936001f4b2a3",
+        "start_time": 1732245334044,
+        "status": "FINISHED",
+        "user_id": ""
+    },
+    "data": {
+        "metrics": {
+            "metric1": 1.0,
+            "metric2": 2.0
+        },
+        "params": {
+            "type": "demo"
+        },
+        "tags": {
+            "branch": "week2",
+            "git_sha": "558a5ce",
+            "mlflow.note.content": "demo run",
+            "mlflow.runColor": "#7d54b2",
+            "mlflow.runName": "demo-run",
+            "mlflow.source.git.commit": "558a5ce75129c29206293b307b1299988105d81d",
+            "mlflow.source.name": "02_mlflow_experiment.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.user": "louisreinaldo@gmail.com"
+        }
+    },
+    "inputs": {
+        "dataset_inputs": []
+    }
+}
