@@ -1,6 +1,7 @@
 # Databricks notebook source
 import json
 import subprocess
+
 import mlflow
 
 mlflow.set_tracking_uri("databricks")
@@ -8,19 +9,16 @@ mlflow.set_tracking_uri("databricks")
 mlflow.set_experiment(experiment_name="/Shared/life-expectancy-basic")
 mlflow.set_experiment_tags({"repository_name": "life-expectancy"})
 
+
 def get_git_sha():
-    try:
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()[:7]
-    except:
-        return None
-    
+    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()[:7]
+
+
 git_sha = get_git_sha()
 print(f"git_sha: {git_sha}")
 
 # COMMAND ----------
-experiments = mlflow.search_experiments(
-    filter_string="tags.repository_name='life-expectancy'"
-)
+experiments = mlflow.search_experiments(filter_string="tags.repository_name='life-expectancy'")
 print(experiments)
 
 # COMMAND ----------
@@ -29,8 +27,7 @@ with open("mlflow_experiment.json", "w") as json_file:
 # COMMAND ----------
 with mlflow.start_run(
     run_name="demo-run",
-    tags={"git_sha": git_sha,
-          "branch": "week2"},
+    tags={"git_sha": git_sha, "branch": "week2"},
     description="demo run",
 ) as run:
     mlflow.log_params({"type": "demo"})

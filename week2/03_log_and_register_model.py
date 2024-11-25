@@ -1,16 +1,18 @@
-from databricks.connect import DatabricksSession
-from life_expectancy.config import ProjectConfig
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from lightgbm import LGBMRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import mlflow
-from mlflow.models import infer_signature
 import subprocess
 
+import mlflow
+from databricks.connect import DatabricksSession
+from lightgbm import LGBMRegressor
+from mlflow.models import infer_signature
+from sklearn.compose import ColumnTransformer
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+from life_expectancy.config import ProjectConfig
+
 mlflow.set_tracking_uri("databricks")
-mlflow.set_registry_uri('databricks-uc') # It must be -uc for registering models to Unity Catalog
+mlflow.set_registry_uri("databricks-uc")  # It must be -uc for registering models to Unity Catalog
 
 # COMMAND ----------
 
@@ -23,12 +25,10 @@ target = config.target
 parameters = config.parameters
 catalog_name = config.catalog_name
 schema_name = config.schema_name
-table_prefix = 'life_expectancy'
+table_prefix = "life_expectancy"
 
 # COMMAND ----------
-spark = DatabricksSession.builder\
-    .profile("dbc-643c4c2b-d6c9")\
-    .getOrCreate()
+spark = DatabricksSession.builder.profile("dbc-643c4c2b-d6c9").getOrCreate()
 
 # Load training and testing sets from Databricks tables
 train_set_spark = spark.table(f"{catalog_name}.{schema_name}.{table_prefix}_train")
@@ -44,38 +44,32 @@ y_test = test_set[target]
 # COMMAND ----------
 # Define the preprocessor for categorical features
 preprocessor = ColumnTransformer(
-    transformers=[('cat', OneHotEncoder(handle_unknown='ignore'), cat_features)], 
-    remainder='passthrough'
+    transformers=[("cat", OneHotEncoder(handle_unknown="ignore"), cat_features)], remainder="passthrough"
 )
 
 # Create the pipeline with preprocessing and the LightGBM regressor
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor),
-    ('regressor', LGBMRegressor(**parameters))
-])
+pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("regressor", LGBMRegressor(**parameters))])
 
-print('pipeline_created')
+print("pipeline_created")
 
 # COMMAND ----------
-mlflow.set_experiment(experiment_name='/Shared/life-expectancy')
+mlflow.set_experiment(experiment_name="/Shared/life-expectancy")
+
 
 def get_git_sha():
-    try:
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()[:7]
-    except:
-        return None
-    
+    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()[:7]
+
+
 git_sha = get_git_sha()
 
-print('starting mlflow run')
+print("starting mlflow run")
 
 # Start an MLflow run to track the training process
 with mlflow.start_run(
-    tags={"git_sha": f"{git_sha}",
-          "branch": "week2"},
+    tags={"git_sha": f"{git_sha}", "branch": "week2"},
 ) as run:
     run_id = run.info.run_id
-    print(f'run_id:{run_id}')
+    print(f"run_id:{run_id}")
 
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
@@ -98,24 +92,21 @@ with mlflow.start_run(
     signature = infer_signature(model_input=X_train, model_output=y_pred)
 
     dataset = mlflow.data.from_spark(
-    train_set_spark, table_name=f"{catalog_name}.{schema_name}.{table_prefix}_train",
-    version="0")
-    mlflow.log_input(dataset, context="training")
-    
-    mlflow.sklearn.log_model(
-        sk_model=pipeline,
-        artifact_path="lightgbm-pipeline-model",
-        signature=signature
+        train_set_spark, table_name=f"{catalog_name}.{schema_name}.{table_prefix}_train", version="0"
     )
+    mlflow.log_input(dataset, context="training")
+
+    mlflow.sklearn.log_model(sk_model=pipeline, artifact_path="lightgbm-pipeline-model", signature=signature)
 
 
 # COMMAND ----------
 model_version = mlflow.register_model(
-    model_uri=f'runs:/{run_id}/lightgbm-pipeline-model',
+    model_uri=f"runs:/{run_id}/lightgbm-pipeline-model",
     name=f"mlops_students.{schema_name}.{table_prefix}_model_basic",
-    tags={"git_sha": f"{git_sha}"})
+    tags={"git_sha": f"{git_sha}"},
+)
 
-print('model_registered')
+print("model_registered")
 
 # COMMAND ----------
 run = mlflow.get_run(run_id)
@@ -123,4 +114,4 @@ dataset_info = run.inputs.dataset_inputs[0].dataset
 dataset_source = mlflow.data.get_source(dataset_info)
 dataset_source.load()
 
-print('dataset loaded')
+print("dataset loaded")
